@@ -1,0 +1,985 @@
+<!-- version: 1.0.0 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Wardrobe</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wardrobe">
+<meta name="theme-color" content="#FBFAF8">
+<style>
+  :root{
+    --ground:#FBFAF8;
+    --plate:#FFFFFF;
+    --ink:#0E0E0E;
+    --muted:#6E6A63;
+    --rule:#DCD8D0;
+    --accent:#1B3A34;
+    --serif: ui-serif, "New York", "Iowan Old Style", Palatino, Georgia, serif;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--serif);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+  button, input, textarea{ font-family:var(--serif); color:var(--ink); }
+  input, textarea{ background:var(--plate); border:1px solid var(--rule); border-radius:0; padding:10px 12px; font-size:16px; width:100%; }
+  input:focus, textarea:focus{ outline:none; border-color:var(--ink); }
+  a{ color:inherit; }
+  #app{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+
+  .view{
+    flex:1;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:calc(20px + env(safe-area-inset-top)) 20px calc(96px + env(safe-area-inset-bottom));
+  }
+  .view.no-nav{ padding-bottom:calc(28px + env(safe-area-inset-bottom)); }
+
+  .utility{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .utility.dark{ color:var(--ink); }
+  .display{ font-size:30px; letter-spacing:-.02em; line-height:1.08; }
+  .rule{ border-top:1px solid var(--rule); }
+
+  .btn{
+    display:inline-block; border:1px solid var(--ink); background:var(--plate); color:var(--ink);
+    padding:13px 18px; font-size:12px; letter-spacing:.1em; text-transform:uppercase; text-align:center;
+    width:100%;
+  }
+  .btn.primary{ background:var(--ink); color:var(--ground); }
+  .btn.accent{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.ghost{ border-color:var(--rule); color:var(--muted); }
+  .btn.small{ width:auto; padding:9px 14px; }
+  .btn:disabled{ opacity:.4; }
+  .btn-row{ display:flex; gap:10px; }
+  .btn-row .btn{ flex:1; }
+
+  .linklike{ background:none; border:none; padding:0; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); text-decoration:underline; }
+
+  nav.tabbar{
+    position:fixed; left:0; right:0; bottom:0;
+    display:flex; background:var(--plate); border-top:1px solid var(--rule);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.tabbar button{
+    flex:1; padding:12px 0 10px; background:none; border:none;
+    font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    border-top:2px solid transparent;
+  }
+  nav.tabbar button.active{ color:var(--accent); border-top-color:var(--accent); }
+
+  .header-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px; }
+  .screen-header{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .back-btn{ background:none; border:none; font-size:20px; line-height:1; color:var(--ink); padding:4px 6px 4px 0; }
+
+  /* Draw */
+  .draw-wrap{ display:flex; flex-direction:column; align-items:center; min-height:60vh; justify-content:center; text-align:center; }
+  .plate{
+    width:220px; height:293px; background:var(--plate); border:1px solid var(--rule);
+    display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+    box-shadow:0 16px 34px rgba(14,14,14,.12);
+  }
+  .plate .fallback{ font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:16px; text-align:center; }
+  .plate img{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0;
+    transition:opacity .3s ease, filter .35s ease, transform .35s ease;
+  }
+  .plate img.loaded{ opacity:1; }
+  .plate img.loaded ~ .fallback{ visibility:hidden; }
+  .plate img.cycling{ filter:blur(7px); transform:scale(.94); opacity:.65; }
+  .plate img.settled{ filter:none; transform:scale(1); }
+  .draw-meta{ margin-top:22px; opacity:0; transform:translateY(8px); transition:opacity .4s ease, transform .4s ease; }
+  .draw-meta.show{ opacity:1; transform:translateY(0); }
+  .draw-brand{ margin-top:14px; }
+  .draw-name{ margin-top:4px; }
+  .draw-wear{ margin-top:8px; }
+  .draw-hr{ width:0; height:1px; background:var(--rule); margin:16px auto 0; transition:width .5s ease; }
+  .draw-hr.show{ width:120px; }
+  .draw-actions{ margin-top:26px; width:100%; max-width:280px; display:flex; flex-direction:column; gap:10px; }
+  .empty-note{ color:var(--muted); font-size:14px; line-height:1.5; max-width:280px; margin:0 auto 18px; }
+
+  /* Log */
+  .log-day{ margin-bottom:26px; }
+  .log-day-heading{ margin-bottom:10px; }
+  .log-entry{ display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--rule); }
+  .log-entry-meta .b{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .log-entry-meta .n{ font-size:16px; }
+  .del-btn{ background:none; border:1px solid var(--rule); color:var(--muted); font-size:11px; padding:6px 10px; letter-spacing:.05em; }
+
+  /* Collection */
+  .search-row{ margin-bottom:12px; }
+  .chip-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; padding-bottom:2px; }
+  .chip{ flex:0 0 auto; border:1px solid var(--rule); background:var(--plate); padding:7px 13px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .chip.active{ border-color:var(--ink); color:var(--ink); }
+  .coll-actions{ display:flex; gap:10px; margin-bottom:16px; }
+
+  .row{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--rule); }
+  .row.flash{ background:#F1EFE9; }
+  .thumbwrap{ position:relative; width:46px; height:61px; background:var(--plate); border:1px solid var(--rule); flex:0 0 auto; overflow:hidden; }
+  .thumbwrap .fallback{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--muted); }
+  .thumbwrap img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .35s ease; }
+  .thumbwrap img.loaded{ opacity:1; }
+  .thumbwrap img.loaded ~ .fallback{ visibility:hidden; }
+  .row-meta{ flex:1; min-width:0; }
+  .row-meta .b{ font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .row-meta .n{ font-size:15px; line-height:1.25; }
+  .cats{ display:flex; flex-direction:column; gap:4px; flex:0 0 auto; }
+  .cats-row{ display:flex; gap:4px; }
+  .catbtn{ font-size:9px; letter-spacing:.05em; text-transform:uppercase; padding:5px 7px; border:1px solid var(--rule); background:var(--plate); color:var(--muted); }
+  .catbtn.active{ background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .fraglink{ font-size:14px; color:var(--muted); text-decoration:none; padding:4px; flex:0 0 auto; }
+
+  .sentinel{ height:1px; }
+  .load-more-note{ text-align:center; padding:16px 0; color:var(--muted); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+
+  .footer-note{ margin-top:28px; padding-top:16px; border-top:1px solid var(--rule); color:var(--muted); font-size:11px; line-height:1.6; }
+  .footer-note .ver{ letter-spacing:.1em; text-transform:uppercase; }
+
+  /* Add / Backup screens */
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; margin-bottom:6px; }
+  .preview-plate{ width:140px; height:187px; margin:0 auto 18px; background:var(--plate); border:1px solid var(--rule); position:relative; overflow:hidden; }
+  .preview-plate img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .3s ease; }
+  .preview-plate img.loaded{ opacity:1; }
+  .preview-plate .fallback{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; font-size:11px; color:var(--muted); padding:10px; }
+  .notice{ padding:14px; border:1px solid var(--rule); font-size:14px; line-height:1.5; margin-bottom:16px; }
+  .notice.warn{ border-color:var(--ink); }
+  .section-title{ margin:28px 0 14px; }
+  .section-title:first-child{ margin-top:0; }
+  .count-list{ font-size:14px; line-height:1.8; margin-bottom:16px; }
+  textarea.mono{ min-height:160px; font-size:13px; line-height:1.5; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view" class="view"></div>
+  <nav class="tabbar" id="tabbar">
+    <button data-tab="draw">Draw</button>
+    <button data-tab="log">Log</button>
+    <button data-tab="collection">Collection</button>
+  </nav>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var VERSION = "1.0.0";
+  var SCHEMA_VERSION = 1;
+
+  // ---- data ----
+  // Original 235-perfume extraction has not been loaded into this build yet.
+  // Populate the collection using Add (paste a Fragrantica URL) until a
+  // bulk re-sync from the cabinet bookmarklet is wired up.
+  var DATA = [];
+
+  var K_STATES = "wardrobe.states";
+  var K_LOG = "wardrobe.log";
+  var K_CUSTOM = "wardrobe.custom";
+  var K_LAST_EXPORT = "wardrobe.lastExport";
+  var K_LAST_DRAW = "wardrobe.lastDraw";
+
+  var CATS = { have:"Have", want:"Want", had:"Had", not:"Not mine" };
+  var CAT_ORDER = ["have","want","had","not"];
+
+  // ---- storage helpers ----
+  function safeParse(json, fallback){
+    if(json == null) return fallback;
+    try{
+      var v = JSON.parse(json);
+      return v == null ? fallback : v;
+    }catch(e){ return fallback; }
+  }
+  function loadStates(){ return safeParse(localStorage.getItem(K_STATES), {}); }
+  function saveStates(s){ localStorage.setItem(K_STATES, JSON.stringify(s)); }
+
+  function genId(){
+    if(self.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,8);
+  }
+
+  function loadLog(){
+    var raw = safeParse(localStorage.getItem(K_LOG), []);
+    if(!Array.isArray(raw)) raw = [];
+    var changed = false;
+    var migrated = raw.map(function(e){
+      if(e && typeof e === "object" && !e.e){
+        changed = true;
+        return { e: genId(), i: e.i, d: e.d };
+      }
+      return e;
+    });
+    if(changed) saveLog(migrated);
+    return migrated;
+  }
+  function saveLog(l){ localStorage.setItem(K_LOG, JSON.stringify(l)); }
+
+  function loadCustom(){
+    var raw = safeParse(localStorage.getItem(K_CUSTOM), []);
+    return Array.isArray(raw) ? raw : [];
+  }
+  function saveCustom(c){ localStorage.setItem(K_CUSTOM, JSON.stringify(c)); }
+
+  // ---- dates ----
+  function todayISO(){
+    var d = new Date();
+    var tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0,10);
+  }
+  function daysBetween(a, b){
+    var A = Date.parse(a + "T00:00:00Z");
+    var B = Date.parse(b + "T00:00:00Z");
+    return Math.round((B - A) / 86400000);
+  }
+  function dayLabel(iso){
+    var diff = daysBetween(iso, todayISO());
+    if(diff === 0) return "Today";
+    if(diff === 1) return "Yesterday";
+    var d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString(undefined, { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  }
+
+  // ---- collection ----
+  function getCollection(){
+    var custom = loadCustom();
+    var byId = new Map();
+    DATA.forEach(function(p){ byId.set(p.i, { i:p.i, b:p.b, n:p.n, url:null }); });
+    custom.forEach(function(p){ byId.set(p.i, { i:p.i, b:p.b, n:p.n, url:p.url || null }); });
+    return Array.from(byId.values());
+  }
+  function findInCollection(id){
+    return getCollection().find(function(p){ return String(p.i) === String(id); });
+  }
+  function getCategory(id, states){
+    if(states[id]) return states[id];
+    var orig = DATA.find(function(p){ return p.i === id; });
+    if(orig && orig.s) return orig.s;
+    return "have";
+  }
+  function bottleImgUrl(id){ return "https://fimgs.net/mdimg/perfume/375x500." + encodeURIComponent(id) + ".jpg"; }
+  function fragranticaLink(p){
+    if(p.url) return p.url;
+    var q = ((p.b ? p.b + " " : "") + (p.n || "")).trim() || p.i;
+    return "https://www.fragrantica.com/search/?query=" + encodeURIComponent(q);
+  }
+  function wearEntriesFor(id, log){ return log.filter(function(e){ return String(e.i) === String(id); }); }
+  function wearLine(id, log){
+    var entries = wearEntriesFor(id, log);
+    if(!entries.length) return "Never worn";
+    var last = entries.reduce(function(a,b){ return a.d > b.d ? a : b; });
+    var days = daysBetween(last.d, todayISO());
+    if(days <= 0) return "Worn today";
+    if(days === 1) return "Worn yesterday";
+    return "Worn " + days + " days ago";
+  }
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
+    });
+  }
+
+  // ---- fragrantica url parsing ----
+  var FRAG_RE = /fragrantica\.[a-z0-9.]+\/perfume\/([^\/?#]+)\/(.+?)-(\d+)\.html/i;
+  function parseFragranticaInput(raw){
+    raw = String(raw || "").trim();
+    if(!raw) return null;
+    if(/^\d{2,8}$/.test(raw)){
+      return { i: raw, b:"", n:"", url:null };
+    }
+    var m = raw.match(FRAG_RE);
+    if(!m) return null;
+    function clean(s){
+      var out = s;
+      try{ out = decodeURIComponent(s); }catch(e){ out = s; }
+      return out.replace(/-/g, " ").replace(/\s+/g, " ").trim();
+    }
+    return { i: m[3], b: clean(m[1]), n: clean(m[2]), url: raw };
+  }
+  function preloadImage(url, cb){
+    var img = new Image();
+    var done = false;
+    img.onload = function(){ if(!done){ done = true; cb(true); } };
+    img.onerror = function(){ if(!done){ done = true; cb(false); } };
+    img.src = url;
+    setTimeout(function(){ if(!done){ done = true; cb(false); } }, 6000);
+  }
+
+  // ---- app state ----
+  var state = {
+    tab: "draw",
+    screen: null,          // null | 'add' | 'backup'
+    search: "",
+    searchInput: "",       // raw, pre-debounce
+    filterCat: "all",
+    renderLimit: 60,
+    draw: { current:null, drawing:false, revealed:false },
+    add: { step:"input", raw:"", parsed:null, dup:null, imgState:"loading", brand:"", name:"", cat:"have" },
+    backup: { exportText:"", importRaw:"", importParsed:null, pending:null }
+  };
+  var searchDebounce = null;
+  var pendingPrefillSearch = null;
+
+  var viewEl = document.getElementById("view");
+  var tabbarEl = document.getElementById("tabbar");
+
+  function setTab(t){
+    state.tab = t;
+    state.screen = null;
+    render();
+  }
+  tabbarEl.addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-tab]");
+    if(btn) setTab(btn.getAttribute("data-tab"));
+  });
+
+  // ================= DRAW =================
+  function renderDraw(){
+    var collection = getCollection();
+    var states = loadStates();
+    var log = loadLog();
+    var haveList = collection.filter(function(p){ return getCategory(p.i, states) === "have"; });
+
+    var html = '<div class="draw-wrap">';
+
+    if(!haveList.length){
+      html += '<div class="utility">Draw</div>';
+      html += '<p class="empty-note" style="margin-top:16px;">Nothing is marked Have yet. Add a perfume and mark it Have, and it will show up here.</p>';
+      html += '<div style="max-width:220px;width:100%;"><button class="btn primary" onclick="app.setTab(\'collection\')">Go to Collection</button></div>';
+      html += '</div>';
+      viewEl.innerHTML = html;
+      return;
+    }
+
+    var d = state.draw;
+    if(!d.current){
+      html += '<div class="plate"><span class="fallback">Tap Draw</span></div>';
+      html += '<div class="draw-actions" style="margin-top:26px;">';
+      html += '<button class="btn accent" onclick="app.doDraw()">Draw</button>';
+      html += '</div>';
+    }else{
+      var p = d.current;
+      var imgCls = "";
+      if(d.drawing) imgCls = "loaded cycling";
+      else if(d.revealed) imgCls = "loaded settled";
+      html += '<div class="plate" id="drawPlate">';
+      html += '<img id="drawImg" class="' + imgCls + '" src="' + bottleImgUrl(p.i) + '" onerror="this.classList.remove(\'loaded\')">';
+      html += '<span class="fallback">' + esc(p.b || "Wardrobe") + '</span>';
+      html += '</div>';
+
+      var metaCls = d.revealed ? "draw-meta show" : "draw-meta";
+      var hrCls = d.revealed ? "draw-hr show" : "draw-hr";
+      html += '<div class="' + metaCls + '">';
+      html += '<div class="utility draw-brand">' + esc(p.b || "Unknown brand") + '</div>';
+      html += '<div class="display draw-name">' + esc(p.n || "Untitled") + '</div>';
+      html += '<div class="utility draw-wear">' + esc(wearLine(p.i, log)) + '</div>';
+      html += '<div class="' + hrCls + '"></div>';
+      html += '</div>';
+
+      html += '<div class="draw-actions">';
+      html += '<button class="btn primary" onclick="app.logCurrentDraw()">Log this wear</button>';
+      html += '<button class="btn ghost" onclick="app.doDraw()">Draw again</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+    viewEl.innerHTML = html;
+  }
+
+  var DRAW_STEPS = 7;
+  var DRAW_STEP_MS = 90;
+  function doDraw(){
+    var collection = getCollection();
+    var states = loadStates();
+    var haveList = collection.filter(function(p){ return getCategory(p.i, states) === "have"; });
+    if(!haveList.length) return;
+
+    var lastId = localStorage.getItem(K_LAST_DRAW);
+    var pool = haveList;
+    if(haveList.length > 1) pool = haveList.filter(function(p){ return String(p.i) !== String(lastId); });
+    var final = pool[Math.floor(Math.random() * pool.length)];
+
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if(reduced || haveList.length === 1){
+      settleDraw(final);
+      return;
+    }
+
+    state.draw.drawing = true;
+    state.draw.revealed = false;
+    state.draw.current = haveList[Math.floor(Math.random() * haveList.length)];
+    render();
+
+    var step = 0;
+    var timer = setInterval(function(){
+      step++;
+      if(step >= DRAW_STEPS){
+        clearInterval(timer);
+        settleDraw(final);
+        return;
+      }
+      state.draw.current = haveList[Math.floor(Math.random() * haveList.length)];
+      var img = document.getElementById("drawImg");
+      if(img){
+        img.src = bottleImgUrl(state.draw.current.i);
+        img.className = "loaded cycling";
+      }
+      var fb = document.querySelector("#drawPlate .fallback");
+      if(fb) fb.textContent = state.draw.current.b || "Wardrobe";
+    }, DRAW_STEP_MS);
+  }
+  function settleDraw(final){
+    state.draw.current = final;
+    state.draw.drawing = false;
+    state.draw.revealed = false;
+    localStorage.setItem(K_LAST_DRAW, final.i);
+    render();
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        state.draw.revealed = true;
+        var img = document.getElementById("drawImg");
+        if(img) img.className = "loaded settled";
+        var meta = document.querySelector(".draw-meta");
+        if(meta) meta.classList.add("show");
+        var hr = document.querySelector(".draw-hr");
+        if(hr) hr.classList.add("show");
+      });
+    });
+  }
+  function logCurrentDraw(){
+    var p = state.draw.current;
+    if(!p) return;
+    var log = loadLog();
+    log.push({ e: genId(), i: p.i, d: todayISO() });
+    saveLog(log);
+    render();
+  }
+
+  // ================= LOG =================
+  function renderLog(){
+    var log = loadLog().slice().sort(function(a,b){ return a.d < b.d ? 1 : a.d > b.d ? -1 : 0; });
+    var collection = getCollection();
+    var byId = {};
+    collection.forEach(function(p){ byId[p.i] = p; });
+
+    var html = '<div class="header-row"><div class="display">Log</div></div>';
+
+    if(!log.length){
+      html += '<p class="empty-note" style="margin:0;">No wear logged yet. Draw a perfume, or log one manually from the Draw screen.</p>';
+      viewEl.innerHTML = html;
+      return;
+    }
+
+    var groups = [];
+    var groupByDate = {};
+    log.forEach(function(entry){
+      if(!groupByDate[entry.d]){
+        groupByDate[entry.d] = [];
+        groups.push(entry.d);
+      }
+      groupByDate[entry.d].push(entry);
+    });
+
+    groups.forEach(function(date){
+      html += '<div class="log-day">';
+      html += '<div class="utility log-day-heading">' + esc(dayLabel(date)) + '</div>';
+      groupByDate[date].forEach(function(entry){
+        var p = byId[entry.i];
+        var b = p ? p.b : "Unknown";
+        var n = p ? p.n : ("Perfume " + entry.i);
+        html += '<div class="log-entry">';
+        html += '<div class="log-entry-meta"><div class="b">' + esc(b) + '</div><div class="n">' + esc(n) + '</div></div>';
+        html += '<button class="del-btn" onclick="app.deleteLogEntry(\'' + entry.e + '\')">Remove</button>';
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+
+    viewEl.innerHTML = html;
+  }
+  function deleteLogEntry(entryId){
+    var log = loadLog().filter(function(e){ return e.e !== entryId; });
+    saveLog(log);
+    render();
+  }
+
+  // ================= COLLECTION =================
+  function lastExportDaysAgo(){
+    var v = localStorage.getItem(K_LAST_EXPORT);
+    if(!v) return null;
+    return daysBetween(v.slice(0,10), todayISO());
+  }
+  function backupReminderText(){
+    var days = lastExportDaysAgo();
+    if(days === null) return "No backup yet. Export your data from Backup below.";
+    if(days > 30) return "Last backup " + days + " days ago. Consider exporting again.";
+    return null;
+  }
+
+  function renderCollection(){
+    var collection = getCollection().slice().sort(function(a,b){
+      var ab = (a.b||"").toLowerCase(), bb = (b.b||"").toLowerCase();
+      if(ab !== bb) return ab < bb ? -1 : 1;
+      return (a.n||"").toLowerCase() < (b.n||"").toLowerCase() ? -1 : 1;
+    });
+    var states = loadStates();
+    var q = state.search.trim().toLowerCase();
+
+    var filtered = collection.filter(function(p){
+      if(state.filterCat !== "all" && getCategory(p.i, states) !== state.filterCat) return false;
+      if(!q) return true;
+      return (p.b||"").toLowerCase().indexOf(q) !== -1 || (p.n||"").toLowerCase().indexOf(q) !== -1;
+    });
+
+    var shown = filtered.slice(0, state.renderLimit);
+
+    var html = '<div class="header-row"><div class="display">Collection</div><div class="utility">' + collection.length + ' total</div></div>';
+
+    html += '<div class="coll-actions">';
+    html += '<button class="btn small" onclick="app.openAdd()">+ Add</button>';
+    html += '<button class="btn small ghost" onclick="app.openBackup()">Backup</button>';
+    html += '</div>';
+
+    html += '<div class="search-row"><input id="searchInput" type="search" placeholder="Search brand or name" value="' + esc(state.searchInput) + '"></div>';
+
+    html += '<div class="chip-row">';
+    ["all"].concat(CAT_ORDER).forEach(function(c){
+      var label = c === "all" ? "All" : CATS[c];
+      var active = state.filterCat === c ? " active" : "";
+      html += '<button class="chip' + active + '" onclick="app.setFilterCat(\'' + c + '\')">' + label + '</button>';
+    });
+    html += '</div>';
+
+    if(!collection.length){
+      html += '<p class="empty-note" style="margin:20px 0 0;max-width:none;">Nothing in the collection yet. Use Add to paste a Fragrantica link and bring in your first bottle.</p>';
+    }else if(!filtered.length){
+      html += '<p class="empty-note" style="margin:20px 0 0;max-width:none;">No matches.</p>';
+    }else{
+      shown.forEach(function(p){
+        var cat = getCategory(p.i, states);
+        var link = fragranticaLink(p);
+        html += '<div class="row" data-id="' + esc(p.i) + '">';
+        html += '<div class="thumbwrap"><img loading="lazy" src="' + bottleImgUrl(p.i) + '" onload="this.classList.add(\'loaded\')" onerror="this.remove()"><span class="fallback">' + esc((p.b||"?").charAt(0)) + '</span></div>';
+        html += '<div class="row-meta"><div class="b">' + esc(p.b) + '</div><div class="n">' + esc(p.n) + '</div></div>';
+        html += '<div class="cats">';
+        html += '<div class="cats-row">';
+        ["have","want"].forEach(function(c){
+          var active = cat === c ? " active" : "";
+          html += '<button class="catbtn' + active + '" onclick="app.setCategory(\'' + esc(p.i) + '\',\'' + c + '\')">' + CATS[c] + '</button>';
+        });
+        html += '</div><div class="cats-row">';
+        ["had","not"].forEach(function(c){
+          var active = cat === c ? " active" : "";
+          html += '<button class="catbtn' + active + '" onclick="app.setCategory(\'' + esc(p.i) + '\',\'' + c + '\')">' + CATS[c] + '</button>';
+        });
+        html += '</div></div>';
+        html += '<a class="fraglink" href="' + esc(link) + '" target="_blank" rel="noopener">&#8599;</a>';
+        html += '</div>';
+      });
+      if(filtered.length > shown.length){
+        html += '<div class="sentinel" id="collSentinel"></div>';
+        html += '<div class="load-more-note">Loading more&hellip;</div>';
+      }
+    }
+
+    var reminder = backupReminderText();
+    html += '<div class="footer-note">';
+    if(reminder) html += '<div>' + esc(reminder) + '</div>';
+    html += '<div class="ver">Wardrobe v' + VERSION + '</div>';
+    html += '</div>';
+
+    viewEl.innerHTML = html;
+
+    var input = document.getElementById("searchInput");
+    if(input){
+      input.addEventListener("input", function(e){
+        state.searchInput = e.target.value;
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(function(){
+          state.search = state.searchInput;
+          state.renderLimit = 60;
+          render();
+          var el = document.getElementById("searchInput");
+          if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+        }, 200);
+      });
+    }
+
+    var sentinel = document.getElementById("collSentinel");
+    if(sentinel && "IntersectionObserver" in window){
+      var io = new IntersectionObserver(function(entries){
+        if(entries[0].isIntersecting){
+          io.disconnect();
+          state.renderLimit += 60;
+          render();
+        }
+      });
+      io.observe(sentinel);
+    }
+
+    if(pendingPrefillSearch){
+      var flashId = pendingPrefillSearch.id;
+      pendingPrefillSearch = null;
+      var rowEl = document.querySelector('.row[data-id="' + CSS.escape(String(flashId)) + '"]');
+      if(rowEl){
+        rowEl.classList.add("flash");
+        rowEl.scrollIntoView({ block:"center" });
+      }
+    }
+  }
+  function setFilterCat(c){ state.filterCat = c; state.renderLimit = 60; render(); }
+  function setCategory(id, cat){
+    var states = loadStates();
+    states[id] = cat;
+    saveStates(states);
+    render();
+  }
+
+  // ================= ADD PERFUME =================
+  function openAdd(){
+    state.screen = "add";
+    state.add = { step:"input", raw:"", parsed:null, dup:null, imgState:"loading", brand:"", name:"", cat:"have" };
+    render();
+  }
+  function closeAdd(){ state.screen = null; render(); }
+
+  function renderAdd(){
+    var a = state.add;
+    var html = '<div class="screen-header"><button class="back-btn" onclick="app.closeAdd()">&#8249;</button><div class="display" style="font-size:22px;">Add perfume</div></div>';
+
+    if(a.step === "input"){
+      html += '<div class="section-title utility">Paste a Fragrantica link</div>';
+      html += '<div class="field"><textarea id="addRaw" rows="3" placeholder="https://www.fragrantica.com/perfume/Brand/Name-12345.html or just the numeric id">' + esc(a.raw) + '</textarea></div>';
+      if(a.error) html += '<div class="notice warn">' + esc(a.error) + '</div>';
+      html += '<button class="btn primary" onclick="app.addContinue()">Continue</button>';
+
+      html += '<div class="section-title utility">Find the link</div>';
+      html += '<p style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.5;">No search inside the app. This opens Fragrantica in a new tab so you can find the page and copy its address back here.</p>';
+      html += '<div class="field"><input id="addSearchQ" type="text" placeholder="Brand or name to look up"></div>';
+      html += '<button class="btn ghost" onclick="app.searchFragrantica()">Search Fragrantica</button>';
+    }
+
+    if(a.step === "dup"){
+      var dp = a.dup;
+      var states = loadStates();
+      var cat = CATS[getCategory(dp.i, states)];
+      html += '<div class="notice">Already in your collection as <strong>' + esc(dp.b) + ' ' + esc(dp.n) + '</strong>, marked ' + esc(cat) + '.</div>';
+      html += '<div class="btn-row"><button class="btn" onclick="app.jumpToExisting(\'' + esc(dp.i) + '\')">View in Collection</button><button class="btn ghost" onclick="app.addBackToInput()">Back</button></div>';
+    }
+
+    if(a.step === "preview"){
+      html += '<div class="preview-plate" id="previewPlate">';
+      if(a.imgState === "ok") html += '<img class="loaded" src="' + bottleImgUrl(a.parsed.i) + '">';
+      else if(a.imgState === "loading") html += '<span class="fallback">Loading image&hellip;</span>';
+      else html += '<span class="fallback">Image not found. You can still save.</span>';
+      html += '</div>';
+
+      html += '<div class="field"><label class="utility">Brand</label><input id="addBrand" type="text" value="' + esc(a.brand) + '"></div>';
+      html += '<div class="field"><label class="utility">Name</label><input id="addName" type="text" value="' + esc(a.name) + '"></div>';
+      if(!a.parsed.url){
+        html += '<div class="notice">Only an id was given, so brand and name were not read from a page. Fill them in by hand.</div>';
+      }else{
+        html += '<p style="font-size:12px;color:var(--muted);margin:-8px 0 16px;line-height:1.5;">Taken from the URL, which strips accents. Fix the spelling if it needs it.</p>';
+      }
+
+      html += '<div class="field"><label class="utility">Category</label><div class="cats-row" style="gap:8px;">';
+      CAT_ORDER.forEach(function(c){
+        var active = a.cat === c ? " active" : "";
+        html += '<button class="catbtn' + active + '" style="flex:1;padding:10px 0;" onclick="app.setAddCat(\'' + c + '\')">' + CATS[c] + '</button>';
+      });
+      html += '</div></div>';
+
+      html += '<div class="btn-row"><button class="btn primary" onclick="app.saveAdd()">Save</button><button class="btn ghost" onclick="app.addBackToInput()">Cancel</button></div>';
+    }
+
+    viewEl.innerHTML = html;
+
+    var raw = document.getElementById("addRaw");
+    if(raw) raw.addEventListener("input", function(e){ state.add.raw = e.target.value; });
+    var bEl = document.getElementById("addBrand");
+    if(bEl) bEl.addEventListener("input", function(e){ state.add.brand = e.target.value; });
+    var nEl = document.getElementById("addName");
+    if(nEl) nEl.addEventListener("input", function(e){ state.add.name = e.target.value; });
+  }
+
+  function addBackToInput(){
+    state.add.step = "input";
+    state.add.error = null;
+    render();
+  }
+  function addContinue(){
+    var parsed = parseFragranticaInput(state.add.raw);
+    if(!parsed){
+      state.add.error = "Could not read a Fragrantica id from that. Paste the full perfume page URL, or just the numeric id.";
+      render();
+      return;
+    }
+    var existing = findInCollection(parsed.i);
+    if(existing){
+      state.add.step = "dup";
+      state.add.dup = existing;
+      render();
+      return;
+    }
+    state.add.error = null;
+    state.add.parsed = parsed;
+    state.add.brand = parsed.b || "";
+    state.add.name = parsed.n || "";
+    state.add.cat = "have";
+    state.add.imgState = "loading";
+    state.add.step = "preview";
+    render();
+    preloadImage(bottleImgUrl(parsed.i), function(ok){
+      state.add.imgState = ok ? "ok" : "fail";
+      if(state.screen === "add" && state.add.step === "preview") render();
+    });
+  }
+  function setAddCat(c){ state.add.cat = c; render(); }
+  function saveAdd(){
+    var a = state.add;
+    var brand = (a.brand || "").trim();
+    var name = (a.name || "").trim();
+    if(!brand || !name){
+      alert("Brand and name are both required.");
+      return;
+    }
+    var custom = loadCustom();
+    custom = custom.filter(function(p){ return p.i !== a.parsed.i; });
+    custom.push({ i:a.parsed.i, b:brand, n:name, url:a.parsed.url || null, added: todayISO() });
+    saveCustom(custom);
+    var states = loadStates();
+    states[a.parsed.i] = a.cat;
+    saveStates(states);
+
+    state.screen = null;
+    state.tab = "collection";
+    state.search = name;
+    state.searchInput = name;
+    state.renderLimit = 60;
+    pendingPrefillSearch = { id: a.parsed.i };
+    render();
+  }
+  function jumpToExisting(id){
+    var p = findInCollection(id);
+    state.screen = null;
+    state.tab = "collection";
+    state.search = p ? p.n : "";
+    state.searchInput = state.search;
+    state.filterCat = "all";
+    state.renderLimit = 60;
+    pendingPrefillSearch = { id: id };
+    render();
+  }
+  function searchFragrantica(){
+    var q = (document.getElementById("addSearchQ") || {}).value || "";
+    q = q.trim();
+    if(!q) return;
+    window.open("https://www.fragrantica.com/search/?query=" + encodeURIComponent(q), "_blank", "noopener");
+  }
+
+  // ================= BACKUP (export / import) =================
+  function openBackup(){
+    state.screen = "backup";
+    state.backup = { exportText:"", importRaw:"", importParsed:null, pending:null, importMsg:null };
+    render();
+  }
+  function closeBackup(){ state.screen = null; render(); }
+
+  function buildExportPayload(){
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      states: loadStates(),
+      log: loadLog(),
+      custom: loadCustom()
+    };
+  }
+
+  function renderBackup(){
+    var b = state.backup;
+    var html = '<div class="screen-header"><button class="back-btn" onclick="app.closeBackup()">&#8249;</button><div class="display" style="font-size:22px;">Backup</div></div>';
+
+    html += '<div class="section-title utility">Export</div>';
+    html += '<p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5;">Copy this and save it somewhere safe, a notes app or an email to yourself. It is the only copy of your categories and wear log outside this phone.</p>';
+    html += '<div class="field"><textarea id="exportArea" class="mono" readonly>' + esc(b.exportText || JSON.stringify(buildExportPayload(), null, 2)) + '</textarea></div>';
+    html += '<button class="btn primary" onclick="app.copyExport()">Copy</button>';
+    if(b.copyMsg) html += '<p style="font-size:12px;color:var(--muted);margin-top:10px;">' + esc(b.copyMsg) + '</p>';
+
+    html += '<div class="section-title utility">Import</div>';
+    html += '<p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5;">Paste a previously exported backup here.</p>';
+    html += '<div class="field"><textarea id="importArea" class="mono" placeholder="Paste exported JSON here">' + esc(b.importRaw) + '</textarea></div>';
+
+    if(!b.importParsed){
+      html += '<button class="btn" onclick="app.previewImport()">Preview</button>';
+      if(b.importError) html += '<div class="notice warn">' + esc(b.importError) + '</div>';
+    }else{
+      var ip = b.importParsed;
+      var counts = { have:0, want:0, had:0, not:0 };
+      Object.keys(ip.states || {}).forEach(function(k){ if(counts[ip.states[k]] !== undefined) counts[ip.states[k]]++; });
+      html += '<div class="notice">';
+      html += '<div class="count-list">';
+      html += 'Have: ' + counts.have + '<br>Want: ' + counts.want + '<br>Had: ' + counts.had + '<br>Not mine: ' + counts.not + '<br>';
+      html += 'Log entries: ' + ((ip.log||[]).length) + '<br>';
+      html += 'Added perfumes: ' + ((ip.custom||[]).length);
+      html += '</div>';
+      html += '</div>';
+
+      html += '<div class="btn-row">';
+      html += '<button class="btn' + (b.pending === "replace" ? " accent" : "") + '" onclick="app.confirmImport(\'replace\')">' + (b.pending === "replace" ? "Tap again to replace" : "Replace all data") + '</button>';
+      html += '<button class="btn' + (b.pending === "merge" ? " accent" : "") + '" onclick="app.confirmImport(\'merge\')">' + (b.pending === "merge" ? "Tap again to merge" : "Merge with existing") + '</button>';
+      html += '</div>';
+      html += '<button class="linklike" style="margin-top:14px;" onclick="app.cancelImport()">Cancel</button>';
+    }
+    if(b.importMsg) html += '<p style="font-size:13px;color:var(--muted);margin-top:14px;">' + esc(b.importMsg) + '</p>';
+
+    viewEl.innerHTML = html;
+
+    var imp = document.getElementById("importArea");
+    if(imp) imp.addEventListener("input", function(e){ state.backup.importRaw = e.target.value; });
+  }
+
+  function copyExport(){
+    var text = JSON.stringify(buildExportPayload(), null, 2);
+    state.backup.exportText = text;
+    var finish = function(ok){
+      localStorage.setItem(K_LAST_EXPORT, new Date().toISOString());
+      state.backup.copyMsg = ok ? "Copied. Paste it somewhere safe." : "Could not copy automatically. Select the text above and copy it by hand.";
+      render();
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ finish(true); }).catch(function(){
+        var ta = document.getElementById("exportArea");
+        if(ta) ta.select();
+        finish(false);
+      });
+    }else{
+      var ta = document.getElementById("exportArea");
+      if(ta) ta.select();
+      finish(false);
+    }
+  }
+
+  function previewImport(){
+    var raw = state.backup.importRaw.trim();
+    if(!raw){ state.backup.importError = "Paste a backup first."; render(); return; }
+    var parsed;
+    try{ parsed = JSON.parse(raw); }catch(e){ parsed = null; }
+    if(!parsed || typeof parsed !== "object" || typeof parsed.states !== "object" || !Array.isArray(parsed.log)){
+      state.backup.importError = "That does not look like a Wardrobe backup.";
+      render();
+      return;
+    }
+    state.backup.importError = null;
+    state.backup.importParsed = {
+      states: parsed.states || {},
+      log: (parsed.log || []).map(function(e){ return e && e.e ? e : { e: genId(), i: e.i, d: e.d }; }),
+      custom: Array.isArray(parsed.custom) ? parsed.custom : []
+    };
+    state.backup.pending = null;
+    render();
+  }
+  function cancelImport(){
+    state.backup.importParsed = null;
+    state.backup.pending = null;
+    render();
+  }
+  function confirmImport(mode){
+    if(state.backup.pending !== mode){
+      state.backup.pending = mode;
+      render();
+      return;
+    }
+    var ip = state.backup.importParsed;
+    if(mode === "replace"){
+      saveStates(ip.states);
+      saveLog(ip.log);
+      saveCustom(ip.custom);
+    }else{
+      var states = loadStates();
+      Object.keys(ip.states).forEach(function(k){ states[k] = ip.states[k]; });
+      saveStates(states);
+
+      var log = loadLog();
+      var seen = {};
+      log.forEach(function(e){ seen[e.e] = true; seen[e.i + "|" + e.d] = true; });
+      ip.log.forEach(function(e){
+        var key2 = e.i + "|" + e.d;
+        if(seen[e.e] || seen[key2]) return;
+        log.push(e);
+        seen[e.e] = true;
+        seen[key2] = true;
+      });
+      saveLog(log);
+
+      var custom = loadCustom();
+      var byId = {};
+      custom.forEach(function(p){ byId[p.i] = p; });
+      ip.custom.forEach(function(p){ byId[p.i] = p; });
+      saveCustom(Array.from(Object.values(byId)));
+    }
+    state.backup.importParsed = null;
+    state.backup.pending = null;
+    state.backup.importRaw = "";
+    state.backup.importMsg = "Import complete.";
+    render();
+  }
+
+  // ================= ROUTER =================
+  function render(){
+    tabbarEl.style.display = state.screen ? "none" : "flex";
+    viewEl.className = "view" + (state.screen ? " no-nav" : "");
+
+    if(state.screen === "add"){ renderAdd(); return; }
+    if(state.screen === "backup"){ renderBackup(); return; }
+
+    Array.prototype.forEach.call(tabbarEl.querySelectorAll("button"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-tab") === state.tab);
+    });
+
+    if(state.tab === "draw") renderDraw();
+    else if(state.tab === "log") renderLog();
+    else renderCollection();
+  }
+
+  window.app = {
+    setTab: setTab,
+    doDraw: doDraw,
+    logCurrentDraw: logCurrentDraw,
+    deleteLogEntry: deleteLogEntry,
+    setFilterCat: setFilterCat,
+    setCategory: setCategory,
+    openAdd: openAdd,
+    closeAdd: closeAdd,
+    addContinue: addContinue,
+    addBackToInput: addBackToInput,
+    setAddCat: setAddCat,
+    saveAdd: saveAdd,
+    jumpToExisting: jumpToExisting,
+    searchFragrantica: searchFragrantica,
+    openBackup: openBackup,
+    closeBackup: closeBackup,
+    copyExport: copyExport,
+    previewImport: previewImport,
+    cancelImport: cancelImport,
+    confirmImport: confirmImport
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
