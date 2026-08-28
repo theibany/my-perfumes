@@ -1,4 +1,4 @@
-<!-- version: 1.1.0 -->
+<!-- version: 1.1.1 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -107,6 +107,8 @@
   .draw-hr.show{ width:120px; }
   .draw-actions{ margin-top:26px; width:100%; max-width:280px; display:flex; flex-direction:column; gap:10px; }
   .empty-note{ color:var(--muted); font-size:14px; line-height:1.5; max-width:280px; margin:0 auto 18px; }
+  @keyframes plateLoading{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
+  .plate.loading-pulse{ animation: plateLoading 1.1s ease-in-out infinite; }
 
   /* Log */
   .log-day{ margin-bottom:26px; }
@@ -178,7 +180,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.1.0";
+  var VERSION = "1.1.1";
   var SCHEMA_VERSION = 1;
 
   // ---- data ----
@@ -564,7 +566,7 @@
     searchInput: "",       // raw, pre-debounce
     filterCat: "all",
     renderLimit: 60,
-    draw: { current:null, drawing:false, revealed:false },
+    draw: { current:null, drawing:false, loading:false, revealed:false },
     add: { step:"input", raw:"", parsed:null, dup:null, imgState:"loading", brand:"", name:"", cat:"have" },
     backup: { exportText:"", importRaw:"", importParsed:null, pending:null }
   };
@@ -608,6 +610,8 @@
       html += '<div class="draw-actions" style="margin-top:26px;">';
       html += '<button class="btn accent" onclick="app.doDraw()">Draw</button>';
       html += '</div>';
+    }else if(d.loading){
+      html += '<div class="plate loading-pulse" id="drawPlate"><span class="fallback">Drawing&hellip;</span></div>';
     }else{
       var p = d.current;
       var imgCls = "";
@@ -621,7 +625,7 @@
       var metaCls = d.revealed ? "draw-meta show" : "draw-meta";
       var hrCls = d.revealed ? "draw-hr show" : "draw-hr";
       html += '<div class="' + metaCls + '">';
-      html += '<div class="utility draw-brand">' + esc(p.b || "Unknown brand") + '</div>';
+      if(p.b) html += '<div class="utility draw-brand">' + esc(p.b) + '</div>';
       html += '<div class="display draw-name">' + esc(p.n || "Untitled") + '</div>';
       html += '<div class="utility draw-wear">' + esc(wearLine(p.i, log)) + '</div>';
       html += '<div class="' + hrCls + '"></div>';
@@ -636,8 +640,13 @@
     viewEl.innerHTML = html;
   }
 
-  var DRAW_STEPS = 7;
-  var DRAW_STEP_MS = 90;
+  var DRAW_STEPS = 6;
+  var DRAW_STEP_MS = 110;
+  var DRAW_POOL_SIZE = 6;
+  var DRAW_PRELOAD_TIMEOUT = 700;
+
+  function onDrawScreen(){ return state.tab === "draw" && !state.screen; }
+
   function doDraw(){
     var collection = getCollection();
     var states = loadStates();
@@ -651,16 +660,59 @@
 
     var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    state.draw.drawing = true;
+    state.draw.loading = true;
+    state.draw.revealed = false;
+    state.draw.current = final;
+    render();
+
     if(reduced || haveList.length === 1){
-      settleDraw(final);
+      preloadImage(bottleImgUrl(final.i), function(){ settleDraw(final); });
       return;
     }
 
-    state.draw.drawing = true;
-    state.draw.revealed = false;
-    state.draw.current = haveList[Math.floor(Math.random() * haveList.length)];
-    render();
+    // Preload a small pool of candidate bottle images before cycling through
+    // them visually, so the cycling animation swaps between images already
+    // sitting in the browser cache instead of stalling on the network.
+    var candidates = [final];
+    var guard = 0;
+    while(candidates.length < Math.min(DRAW_POOL_SIZE, haveList.length) && guard < 50){
+      guard++;
+      var pick = haveList[Math.floor(Math.random() * haveList.length)];
+      if(!candidates.some(function(c){ return c.i === pick.i; })) candidates.push(pick);
+    }
 
+    var loaded = [];
+    var pending = candidates.length;
+    var started = false;
+
+    function begin(){
+      if(started) return;
+      started = true;
+      if(!loaded.length) loaded.push(final);
+      state.draw.loading = false;
+      runCycle(loaded, final);
+    }
+
+    candidates.forEach(function(c){
+      var img = new Image();
+      var settled = false;
+      function done(ok){
+        if(settled) return;
+        settled = true;
+        if(ok) loaded.push(c);
+        pending--;
+        if(pending === 0) begin();
+      }
+      img.onload = function(){ done(true); };
+      img.onerror = function(){ done(false); };
+      img.src = bottleImgUrl(c.i);
+    });
+
+    setTimeout(begin, DRAW_PRELOAD_TIMEOUT);
+  }
+
+  function runCycle(loaded, final){
     var step = 0;
     var timer = setInterval(function(){
       step++;
@@ -669,7 +721,8 @@
         settleDraw(final);
         return;
       }
-      state.draw.current = haveList[Math.floor(Math.random() * haveList.length)];
+      if(!onDrawScreen()) return;
+      state.draw.current = loaded[Math.floor(Math.random() * loaded.length)];
       var img = document.getElementById("drawImg");
       if(img){
         img.src = bottleImgUrl(state.draw.current.i);
@@ -679,14 +732,18 @@
       if(fb) fb.textContent = state.draw.current.b || state.draw.current.n || "Wardrobe";
     }, DRAW_STEP_MS);
   }
+
   function settleDraw(final){
     state.draw.current = final;
     state.draw.drawing = false;
+    state.draw.loading = false;
     state.draw.revealed = false;
     localStorage.setItem(K_LAST_DRAW, final.i);
+    if(!onDrawScreen()) return;
     render();
     requestAnimationFrame(function(){
       requestAnimationFrame(function(){
+        if(!onDrawScreen()) return;
         state.draw.revealed = true;
         var img = document.getElementById("drawImg");
         if(img) img.className = "loaded settled";
