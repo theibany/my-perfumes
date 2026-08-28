@@ -1,4 +1,4 @@
-<!-- version: 1.1.1 -->
+<!-- version: 1.2.0 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -125,8 +125,9 @@
   .chip.active{ border-color:var(--ink); color:var(--ink); }
   .coll-actions{ display:flex; gap:10px; margin-bottom:16px; }
 
-  .row{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--rule); }
+  .row{ padding:12px 0; border-bottom:1px solid var(--rule); }
   .row.flash{ background:#F1EFE9; }
+  .row-top{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
   .thumbwrap{ position:relative; width:46px; height:61px; background:var(--plate); border:1px solid var(--rule); flex:0 0 auto; overflow:hidden; }
   .thumbwrap .fallback{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--muted); }
   .thumbwrap img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .35s ease; }
@@ -135,11 +136,13 @@
   .row-meta{ flex:1; min-width:0; }
   .row-meta .b{ font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
   .row-meta .n{ font-size:15px; line-height:1.25; }
-  .cats{ display:flex; flex-direction:column; gap:4px; flex:0 0 auto; }
+  .row-actions{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding-left:58px; }
   .cats-row{ display:flex; gap:4px; }
   .catbtn{ font-size:9px; letter-spacing:.05em; text-transform:uppercase; padding:5px 7px; border:1px solid var(--rule); background:var(--plate); color:var(--muted); }
   .catbtn.active{ background:var(--ink); color:var(--ground); border-color:var(--ink); }
   .fraglink{ font-size:14px; color:var(--muted); text-decoration:none; padding:4px; flex:0 0 auto; }
+  .removebtn{ font-size:9px; letter-spacing:.05em; text-transform:uppercase; padding:5px 7px; border:1px solid var(--rule); background:var(--plate); color:var(--muted); flex:0 0 auto; margin-left:auto; }
+  .removebtn.pending{ background:var(--ink); color:var(--ground); border-color:var(--ink); }
 
   .sentinel{ height:1px; }
   .load-more-note{ text-align:center; padding:16px 0; color:var(--muted); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
@@ -180,250 +183,253 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.1.1";
+  var VERSION = "1.2.0";
   var SCHEMA_VERSION = 1;
 
   // ---- data ----
-  // Loaded from a bookmarklet extraction of the Fragrantica cabinet. That
-  // extraction only captured id and a combined name string, no brand and
-  // no page url, so b is empty and the Fragrantica link falls back to a
-  // search query until each entry is fixed up by hand or re-synced.
+  // Loaded from a bookmarklet extraction of the Fragrantica cabinet, which
+  // only captured id and a combined name string with no reliable brand
+  // delimiter and no page url. Brand below was split by hand from that
+  // string using general fragrance knowledge, not scraped, so treat it as
+  // a best guess: it may be wrong, and around a dozen entries had no
+  // recognizable brand in the source text at all and are left blank.
+  // Fragrantica links fall back to a search query until fixed up by hand.
   var DATA = [
-    {i:"1822",b:"",n:"Tom Ford Noir de Noir",s:"have"},
-    {i:"58781",b:"",n:"Tom Ford Rose Prick",s:"have"},
-    {i:"48467",b:"",n:"Ella K Parfums Poeme de Sagano",s:"have"},
-    {i:"65983",b:"",n:"Clive Christian Matsukita",s:"have"},
-    {i:"72881",b:"",n:"Who is Elijah Haze",s:"have"},
-    {i:"30530",b:"",n:"Xerjoff XJ 1861 Zefiro",s:"have"},
-    {i:"48376",b:"",n:"Dior Purple Oud",s:"have"},
-    {i:"29716",b:"",n:"Atelier des Ors Lune Feline",s:"have"},
-    {i:"98010",b:"",n:"Atelier des Ors Kawa Karda",s:"have"},
-    {i:"54990",b:"",n:"Tiziana Terenzi Draconis",s:"have"},
-    {i:"97671",b:"",n:"Noème Vanille de Sambava",s:"have"},
-    {i:"98386",b:"",n:"Discothèque Lola At Coat Check",s:"have"},
+    {i:"1822",b:"Tom Ford",n:"Noir de Noir",s:"have"},
+    {i:"58781",b:"Tom Ford",n:"Rose Prick",s:"have"},
+    {i:"48467",b:"Ella K Parfums",n:"Poeme de Sagano",s:"have"},
+    {i:"65983",b:"Clive Christian",n:"Matsukita",s:"have"},
+    {i:"72881",b:"Who is Elijah",n:"Haze",s:"have"},
+    {i:"30530",b:"Xerjoff",n:"XJ 1861 Zefiro",s:"have"},
+    {i:"48376",b:"Dior",n:"Purple Oud",s:"have"},
+    {i:"29716",b:"Atelier des Ors",n:"Lune Feline",s:"have"},
+    {i:"98010",b:"Atelier des Ors",n:"Kawa Karda",s:"have"},
+    {i:"54990",b:"Tiziana Terenzi",n:"Draconis",s:"have"},
+    {i:"97671",b:"No\u00e8me",n:"Vanille de Sambava",s:"have"},
+    {i:"98386",b:"Discoth\u00e8que",n:"Lola At Coat Check",s:"have"},
     {i:"90489",b:"",n:"Masters",s:"have"},
-    {i:"72158",b:"",n:"Le Beau Le Parfum",s:"have"},
-    {i:"123313",b:"",n:"9 PM Night Out",s:"have"},
-    {i:"89050",b:"",n:"Hawas Ice",s:"have"},
+    {i:"72158",b:"Jean Paul Gaultier",n:"Le Beau Le Parfum",s:"have"},
+    {i:"123313",b:"Afnan",n:"9 PM Night Out",s:"have"},
+    {i:"89050",b:"Rasasi",n:"Hawas Ice",s:"have"},
     {i:"100551",b:"",n:"Spanish Tobacco",s:"have"},
-    {i:"70776",b:"",n:"Haltane",s:"have"},
+    {i:"70776",b:"Parfum d'Empire",n:"Haltane",s:"have"},
     {i:"70388",b:"",n:"Favonius",s:"have"},
-    {i:"50009",b:"",n:"I am Trash - Les Fleurs du Déchet",s:"have"},
+    {i:"50009",b:"I am Trash",n:"Les Fleurs du D\u00e9chet",s:"have"},
     {i:"51553",b:"",n:"Oud Aquilaria",s:"have"},
     {i:"51554",b:"",n:"Wanderlust",s:"have"},
-    {i:"31909",b:"",n:"The One for Men Eau de Parfum",s:"have"},
-    {i:"96482",b:"",n:"Amber Oud Aqua Dubai",s:"have"},
-    {i:"75489",b:"",n:"Noir Extreme Parfum",s:"have"},
-    {i:"64501",b:"",n:"Emporio Armani Stronger With You Absolutely",s:"have"},
-    {i:"65414",b:"",n:"9pm",s:"have"},
-    {i:"98689",b:"",n:"Supremacy Collector's Edition Pour Homme",s:"have"},
-    {i:"1942",b:"",n:"Dunhill Pursuit",s:"have"},
-    {i:"70748",b:"",n:"Détour Noir",s:"have"},
+    {i:"31909",b:"Dolce & Gabbana",n:"The One for Men Eau de Parfum",s:"have"},
+    {i:"96482",b:"Al Haramain",n:"Amber Oud Aqua Dubai",s:"have"},
+    {i:"75489",b:"Tom Ford",n:"Noir Extreme Parfum",s:"have"},
+    {i:"64501",b:"Giorgio Armani",n:"Emporio Armani Stronger With You Absolutely",s:"have"},
+    {i:"65414",b:"Afnan",n:"9pm",s:"have"},
+    {i:"98689",b:"Afnan",n:"Supremacy Collector's Edition Pour Homme",s:"have"},
+    {i:"1942",b:"Dunhill",n:"Pursuit",s:"have"},
+    {i:"70748",b:"Al Haramain",n:"D\u00e9tour Noir",s:"have"},
     {i:"103892",b:"",n:"Decision",s:"have"},
-    {i:"60929",b:"",n:"Interlude Black Iris",s:"have"},
-    {i:"69488",b:"",n:"Reflection 45 Man",s:"have"},
-    {i:"34696",b:"",n:"Club de Nuit Intense Man",s:"have"},
-    {i:"77861",b:"",n:"Club de Nuit Intense Man Limited Edition Parfum",s:"have"},
-    {i:"88813",b:"",n:"Avestan",s:"have"},
-    {i:"73664",b:"",n:"The Most Wanted Parfum",s:"have"},
-    {i:"85157",b:"",n:"Animalique",s:"have"},
-    {i:"1952",b:"",n:"Euphoria Men Intense",s:"have"},
-    {i:"297",b:"",n:"212 Men",s:"have"},
-    {i:"46093",b:"",n:"212 VIP Black",s:"have"},
+    {i:"60929",b:"Amouage",n:"Interlude Black Iris",s:"have"},
+    {i:"69488",b:"Amouage",n:"Reflection 45 Man",s:"have"},
+    {i:"34696",b:"Armaf",n:"Club de Nuit Intense Man",s:"have"},
+    {i:"77861",b:"Armaf",n:"Club de Nuit Intense Man Limited Edition Parfum",s:"have"},
+    {i:"88813",b:"Parfums de Marly",n:"Avestan",s:"have"},
+    {i:"73664",b:"Azzaro",n:"The Most Wanted Parfum",s:"have"},
+    {i:"85157",b:"Etat Libre d'Orange",n:"Animalique",s:"have"},
+    {i:"1952",b:"Calvin Klein",n:"Euphoria Men Intense",s:"have"},
+    {i:"297",b:"Carolina Herrera",n:"212 Men",s:"have"},
+    {i:"46093",b:"Carolina Herrera",n:"212 VIP Black",s:"have"},
     {i:"65984",b:"",n:"Gold Myrrh Absolute",s:"have"},
-    {i:"472",b:"",n:"Silver Mountain Water",s:"have"},
-    {i:"13016",b:"",n:"Dior Homme Intense 2011",s:"have"},
+    {i:"472",b:"Creed",n:"Silver Mountain Water",s:"have"},
+    {i:"13016",b:"Dior",n:"Homme Intense 2011",s:"have"},
     {i:"94784",b:"",n:"Rude Oud",s:"have"},
     {i:"91981",b:"",n:"Tropiques",s:"have"},
     {i:"94702",b:"",n:"Aether",s:"have"},
     {i:"94713",b:"",n:"Liquid Brun",s:"have"},
-    {i:"105520",b:"",n:"Vulcan Feu",s:"have"},
-    {i:"81508",b:"",n:"Acqua di Giò Parfum",s:"have"},
-    {i:"96246",b:"",n:"Bottled Absolu",s:"have"},
+    {i:"105520",b:"French Avenue",n:"Vulcan Feu",s:"have"},
+    {i:"81508",b:"Giorgio Armani",n:"Acqua di Gi\u00f2 Parfum",s:"have"},
+    {i:"96246",b:"Hugo Boss",n:"Bottled Absolu",s:"have"},
     {i:"100547",b:"",n:"Cullinan Diamond Iris",s:"have"},
-    {i:"81642",b:"",n:"Le Male Elixir",s:"have"},
-    {i:"67996",b:"",n:"Qaed Al Fursan",s:"have"},
-    {i:"70363",b:"",n:"Blue Laverne",s:"have"},
+    {i:"81642",b:"Jean Paul Gaultier",n:"Le Male Elixir",s:"have"},
+    {i:"67996",b:"Lattafa",n:"Qaed Al Fursan",s:"have"},
+    {i:"70363",b:"Laverne",n:"Blue",s:"have"},
     {i:"70226",b:"",n:"Cuban Tobacco",s:"have"},
-    {i:"15211",b:"",n:"Cedrat Boise",s:"have"},
+    {i:"15211",b:"Mancera",n:"Cedrat Boise",s:"have"},
     {i:"39219",b:"",n:"Perfect Oud",s:"have"},
     {i:"57724",b:"",n:"Russian Leather Eau de Parfum",s:"have"},
     {i:"57384",b:"",n:"Arabians Tonka",s:"have"},
-    {i:"4193",b:"",n:"Individuel",s:"have"},
+    {i:"4193",b:"Mont Blanc",n:"Individuel",s:"have"},
     {i:"106578",b:"",n:"Star Oud",s:"have"},
     {i:"102128",b:"",n:"Nawaf Zaffran",s:"have"},
     {i:"76946",b:"",n:"Oudh Flor Parfum",s:"have"},
-    {i:"63100",b:"",n:"Pegasus Exclusif",s:"have"},
-    {i:"65177",b:"",n:"Invictus Victory",s:"have"},
-    {i:"96817",b:"",n:"Hawas Black",s:"have"},
+    {i:"63100",b:"Parfums de Marly",n:"Pegasus Exclusif",s:"have"},
+    {i:"65177",b:"Rabanne",n:"Invictus Victory",s:"have"},
+    {i:"96817",b:"Rasasi",n:"Hawas Black",s:"have"},
     {i:"68383",b:"",n:"Forest.Blends.",s:"have"},
     {i:"43204",b:"",n:"Regent Leather",s:"have"},
     {i:"60434",b:"",n:"Sparkling Opal",s:"have"},
-    {i:"1826",b:"",n:"Oud Wood",s:"have"},
-    {i:"78740",b:"",n:"Valentino Uomo Born In Roma Intense",s:"have"},
-    {i:"16657",b:"",n:"Eros",s:"have"},
-    {i:"59417",b:"",n:"The Dreamer",s:"have"},
-    {i:"30499",b:"",n:"Spicebomb Extreme",s:"have"},
-    {i:"70789",b:"",n:"Tony Iommi Monkey Special",s:"have"},
-    {i:"5521",b:"",n:"La Nuit de l'Homme",s:"have"},
-    {i:"4922",b:"",n:"Ormonde Jayne Ta'if",s:"have"},
-    {i:"10131",b:"",n:"Le Labo Another 13",s:"have"},
-    {i:"105974",b:"",n:"Chambre52 Tobacco Memories",s:"have"},
-    {i:"4688",b:"",n:"Chanel Les Exclusifs de Chanel Sycomore",s:"have"},
-    {i:"30529",b:"",n:"Xerjoff XJ 1861 Naxos",s:"have"},
-    {i:"53871",b:"",n:"Maison Crivelli Santal Volcanique",s:"have"},
-    {i:"17",b:"",n:"Hermès Terre d'Hermès",s:"have"},
-    {i:"53104",b:"",n:"Arabian Oud Resala",s:"have"},
-    {i:"67775",b:"",n:"Ormonde Jayne 4. Montabaco Intensivo",s:"have"},
-    {i:"65420",b:"",n:"Arabian Oud Sultani",s:"have"},
-    {i:"68198",b:"",n:"Dior Vanilla Diorama",s:"have"},
-    {i:"85182",b:"",n:"Thameen Bravi",s:"have"},
-    {i:"383",b:"",n:"Hugo Boss Boss Bottled",s:"have"},
-    {i:"72796",b:"",n:"Mancera Intense Cedrat Boise",s:"have"},
-    {i:"12201",b:"",n:"Le Labo Santal 33",s:"have"},
-    {i:"31623",b:"",n:"Maison Martin Margiela By the Fireplace",s:"have"},
-    {i:"613",b:"",n:"Chanel Egoiste",s:"have"},
-    {i:"63293",b:"",n:"Narciso Rodriguez Patchouli Musc",s:"have"},
-    {i:"44174",b:"",n:"Nishane Hacivat",s:"have"},
-    {i:"76683",b:"",n:"Xerjoff Erba Gold",s:"have"},
-    {i:"22879",b:"",n:"Giorgio Armani Armani Eau d’Aromes",s:"have"},
-    {i:"101776",b:"",n:"Le Labo Eucalyptus 20",s:"have"},
-    {i:"81870",b:"",n:"Thameen Bohemian Infusion",s:"have"},
-    {i:"64105",b:"",n:"Armaf Club de Nuit Sillage",s:"have"},
-    {i:"28499",b:"",n:"Masque Milano Russian Tea",s:"have"},
-    {i:"32269",b:"",n:"Yves Saint Laurent Tuxedo",s:"have"},
-    {i:"102950",b:"",n:"Roja Dove Parfum De La Nuit",s:"have"},
-    {i:"30164",b:"",n:"Dior Fève Délicieuse",s:"have"},
-    {i:"109331",b:"",n:"Premiere Peau Insuline Safrine",s:"have"},
-    {i:"60035",b:"",n:"Rabanne 1 Million Parfum",s:"have"},
-    {i:"67815",b:"",n:"Arabian Oud Aseel Special Edition",s:"have"},
-    {i:"65993",b:"",n:"Azzaro Azzaro Pour Homme Cologne Intense",s:"have"},
-    {i:"81895",b:"",n:"Goldfield & Banks Australia Ingenious Ginger",s:"have"},
-    {i:"40716",b:"",n:"Penhaligon's The Tragedy of Lord George",s:"have"},
-    {i:"103445",b:"",n:"Gulf Orchid Mango Ice",s:"have"},
-    {i:"39210",b:"",n:"Mizensir Eau de Gingembre",s:"have"},
-    {i:"24191",b:"",n:"Orto Parisi Bergamask",s:"have"},
-    {i:"98713",b:"",n:"Armaf Monarque",s:"have"},
-    {i:"30526",b:"",n:"The Spirit of Dubai Meydan",s:"have"},
-    {i:"53149",b:"",n:"Hugo Boss Boss Bottled 20th Anniversary Edition",s:"have"},
-    {i:"47334",b:"",n:"Zoologist Perfumes Camel",s:"have"},
-    {i:"68271",b:"",n:"Afnan Supremacy Not Only Intense",s:"have"},
-    {i:"221",b:"",n:"Dior Dune",s:"have"},
-    {i:"52616",b:"",n:"Kayali Fragrances Vanilla | 28",s:"have"},
-    {i:"104529",b:"",n:"Lattafa Perfumes Khamrah Dukhan",s:"have"},
-    {i:"87958",b:"",n:"Amouage Jubilation 40 Man",s:"have"},
-    {i:"60284",b:"",n:"Guerlain L'Homme Idéal Extrême",s:"have"},
-    {i:"40816",b:"",n:"Maison Francis Kurkdjian Grand Soir",s:"have"},
-    {i:"98691",b:"",n:"Zimaya Tiramisu Caramel",s:"have"},
-    {i:"70880",b:"",n:"Roberto Cavalli Velour Saffron",s:"have"},
-    {i:"63818",b:"",n:"Omanluxury Royal Incense",s:"have"},
-    {i:"53159",b:"",n:"Arabian Oud Rosewood",s:"have"},
-    {i:"45258",b:"",n:"Giorgio Armani Emporio Armani Stronger With You",s:"have"},
-    {i:"62101",b:"",n:"Parfums de Marly Greenley",s:"have"},
-    {i:"71671",b:"",n:"Hugo Boss The Collection Bold Incense",s:"have"},
-    {i:"44853",b:"",n:"Fort & Manle Fatih Sultan Mehmed",s:"have"},
-    {i:"60300",b:"",n:"Jeroboam Gozo",s:"have"},
-    {i:"105521",b:"",n:"French Avenue Vulcan Sable",s:"have"},
-    {i:"101562",b:"",n:"MAISON ASRAR Vanilla Voyage",s:"have"},
-    {i:"72619",b:"",n:"Carolina Herrera True Oud",s:"have"},
-    {i:"43642",b:"",n:"Carolina Herrera Gold Incense",s:"have"},
-    {i:"107110",b:"",n:"Acqua di Parma Fico di Amalfi La Riserva",s:"have"},
-    {i:"17338",b:"",n:"Versace Versace Pour Homme Oud Noir",s:"have"},
-    {i:"69012",b:"",n:"Arabian Oud Al Fareed",s:"have"},
-    {i:"55156",b:"",n:"Xerjoff Accento",s:"have"},
-    {i:"71672",b:"",n:"Hugo Boss The Collection Daring Saffiano",s:"have"},
-    {i:"71673",b:"",n:"Hugo Boss The Collection Elegant Vetiver",s:"have"},
-    {i:"70424",b:"",n:"Xerjoff Torino21",s:"have"},
-    {i:"101281",b:"",n:"Hugo Boss The Collection Wild Violet",s:"have"},
-    {i:"84109",b:"",n:"Parfums de Marly Althaïr",s:"have"},
-    {i:"32907",b:"",n:"Mancera Aoud Vanille",s:"have"},
-    {i:"100234",b:"",n:"Gucci Gucci Guilty Love Edition Pour Homme 2024",s:"have"},
-    {i:"87460",b:"",n:"Hackett London Absolute",s:"have"},
-    {i:"54785",b:"",n:"Nishane Ani",s:"have"},
-    {i:"38166",b:"",n:"Acqua di Parma Colonia Sandalo Concentrée",s:"have"},
-    {i:"57701",b:"",n:"Versace Vanille Rouge",s:"have"},
-    {i:"103895",b:"",n:"Hugo Boss The Collection Enigmatic Saffiano",s:"have"},
-    {i:"67814",b:"",n:"Arabian Oud Aseel",s:"have"},
-    {i:"93090",b:"",n:"Initio Parfums Prives Oud for Greatness Neo",s:"have"},
-    {i:"70753",b:"",n:"CoSTUME NATIONAL Secret Woods",s:"have"},
-    {i:"84094",b:"",n:"Yves Saint Laurent MYSLF Eau de Parfum",s:"have"},
-    {i:"70883",b:"",n:"Versace Fleur de Maté",s:"have"},
-    {i:"70884",b:"",n:"Versace Gingembre Pétillant",s:"have"},
-    {i:"70886",b:"",n:"Versace Safran Royal",s:"have"},
-    {i:"30947",b:"",n:"Jean Paul Gaultier Ultra Male",s:"have"},
-    {i:"96240",b:"",n:"Maison Alhambra Signatures No. IV",s:"have"},
-    {i:"84112",b:"",n:"Creed Absolu Aventus 2023",s:"have"},
-    {i:"84074",b:"",n:"Hugo Boss Boss Bottled Elixir",s:"have"},
-    {i:"46662",b:"",n:"Mancera Black Vanilla",s:"have"},
-    {i:"103346",b:"",n:"Riiffs Perfumes Momento",s:"have"},
-    {i:"92497",b:"",n:"Xerjoff Deified Tony Iommi Parfum",s:"have"},
-    {i:"23084",b:"",n:"Les Liquides Imaginaires Fortis",s:"have"},
-    {i:"62856",b:"",n:"Amouage Enclave",s:"have"},
-    {i:"99238",b:"",n:"Afnan 9 PM Rebel",s:"have"},
-    {i:"100895",b:"",n:"Giorgio Armani Emporio Armani Stronger With You Parfum",s:"have"},
-    {i:"20509",b:"",n:"Thameen Carved Oud",s:"have"},
-    {i:"32733",b:"",n:"Perry Ellis Black Vanilla Absolute",s:"have"},
-    {i:"30996",b:"",n:"Initio Parfums Prives Magnetic Blend 8",s:"have"},
-    {i:"104238",b:"",n:"Davidoff Cool Elixir",s:"have"},
-    {i:"10145",b:"",n:"Amouage Memoir Man",s:"have"},
-    {i:"30989",b:"",n:"Initio Parfums Prives Absolute Aphrodisiac",s:"have"},
-    {i:"46633",b:"",n:"Parfums de Marly Layton Exclusif",s:"have"},
-    {i:"61928",b:"",n:"Jo Malone London Cypress & Grapevine Cologne Intense",s:"have"},
-    {i:"50603",b:"",n:"By Kilian Dark Lord",s:"have"},
-    {i:"43335",b:"",n:"Mancera Black Gold",s:"have"},
-    {i:"35681",b:"",n:"Ralph Lauren Polo Supreme Leather",s:"have"},
-    {i:"101102",b:"",n:"Givenchy Gentleman Society Eau de Parfum Ambrée",s:"have"},
-    {i:"40373",b:"",n:"Carolina Herrera Mystery Tobacco",s:"have"},
-    {i:"39314",b:"",n:"Parfums de Marly Layton",s:"have"},
-    {i:"64153",b:"",n:"Amouage Interlude 53 Man",s:"have"},
-    {i:"49755",b:"",n:"Louis Vuitton Ombre Nomade",s:"have"},
-    {i:"96902",b:"",n:"Jo Malone London Hinoki & Cedarwood",s:"have"},
-    {i:"45396",b:"",n:"Prada Prada L'Homme Intense",s:"have"},
-    {i:"107710",b:"",n:"Fragrance World Barakkat Rouge 540 Extrait de Parfum",s:"have"},
-    {i:"94022",b:"",n:"French Avenue Royal Blend",s:"have"},
-    {i:"102415",b:"",n:"Swiss Arabian Incense 01",s:"have"},
-    {i:"1825",b:"",n:"Tom Ford Tobacco Vanille",s:"have"},
-    {i:"1018",b:"",n:"Tom Ford Black Orchid",s:"have"},
-    {i:"24922",b:"",n:"Lacoste Fragrances Lacoste Live",s:"have"},
-    {i:"11043",b:"",n:"Lacoste Fragrances Eau de Lacoste L.12.12. White",s:"have"},
-    {i:"44535",b:"",n:"Montblanc Emblem Absolu",s:"have"},
-    {i:"88175",b:"",n:"Lattafa Perfumes Khamrah Qahwa",s:"have"},
-    {i:"40031",b:"",n:"Versace Versace Pour Homme Dylan Blue",s:"have"},
-    {i:"54720",b:"",n:"Marc-Antoine Barrois Ganymede",s:"have"},
-    {i:"64948",b:"",n:"Lattafa Perfumes Bade'e Al Oud Oud for Glory",s:"have"},
-    {i:"69013",b:"",n:"Arabian Oud Kashmir Musk",s:"have"},
-    {i:"75805",b:"",n:"Lattafa Perfumes Khamrah",s:"have"},
-    {i:"81099",b:"",n:"Lattafa Perfumes Ishq Al Shuyukh Silver",s:"have"},
-    {i:"82732",b:"",n:"Reyane Tradition R2B2 A.I.",s:"have"},
-    {i:"82734",b:"",n:"Reyane Tradition R2B2 Crypto",s:"have"},
-    {i:"92658",b:"",n:"Al Haramain Perfumes Detour Noir Intense",s:"have"},
-    {i:"96074",b:"",n:"Laverne Champion",s:"have"},
-    {i:"100553",b:"",n:"Ibraheem AlQurashi Greek Tobacco",s:"have"},
-    {i:"100572",b:"",n:"Ibraheem AlQurashi Sapphire Leather",s:"have"},
+    {i:"1826",b:"Tom Ford",n:"Oud Wood",s:"have"},
+    {i:"78740",b:"Valentino",n:"Uomo Born In Roma Intense",s:"have"},
+    {i:"16657",b:"Versace",n:"Eros",s:"have"},
+    {i:"59417",b:"Versace",n:"The Dreamer",s:"have"},
+    {i:"30499",b:"Viktor & Rolf",n:"Spicebomb Extreme",s:"have"},
+    {i:"70789",b:"Xerjoff",n:"Tony Iommi Monkey Special",s:"have"},
+    {i:"5521",b:"Yves Saint Laurent",n:"La Nuit de l'Homme",s:"have"},
+    {i:"4922",b:"Ormonde Jayne",n:"Ta'if",s:"have"},
+    {i:"10131",b:"Le Labo",n:"Another 13",s:"have"},
+    {i:"105974",b:"Chambre52",n:"Tobacco Memories",s:"have"},
+    {i:"4688",b:"Chanel",n:"Les Exclusifs de Chanel Sycomore",s:"have"},
+    {i:"30529",b:"Xerjoff",n:"XJ 1861 Naxos",s:"have"},
+    {i:"53871",b:"Maison Crivelli",n:"Santal Volcanique",s:"have"},
+    {i:"17",b:"Herm\u00e8s",n:"Terre d'Herm\u00e8s",s:"have"},
+    {i:"53104",b:"Arabian Oud",n:"Resala",s:"have"},
+    {i:"67775",b:"Ormonde Jayne",n:"4. Montabaco Intensivo",s:"have"},
+    {i:"65420",b:"Arabian Oud",n:"Sultani",s:"have"},
+    {i:"68198",b:"Dior",n:"Vanilla Diorama",s:"have"},
+    {i:"85182",b:"Thameen",n:"Bravi",s:"have"},
+    {i:"383",b:"Hugo Boss",n:"Boss Bottled",s:"have"},
+    {i:"72796",b:"Mancera",n:"Intense Cedrat Boise",s:"have"},
+    {i:"12201",b:"Le Labo",n:"Santal 33",s:"have"},
+    {i:"31623",b:"Maison Martin Margiela",n:"By the Fireplace",s:"have"},
+    {i:"613",b:"Chanel",n:"Egoiste",s:"have"},
+    {i:"63293",b:"Narciso Rodriguez",n:"Patchouli Musc",s:"have"},
+    {i:"44174",b:"Nishane",n:"Hacivat",s:"have"},
+    {i:"76683",b:"Xerjoff",n:"Erba Gold",s:"have"},
+    {i:"22879",b:"Giorgio Armani",n:"Armani Eau d'Aromes",s:"have"},
+    {i:"101776",b:"Le Labo",n:"Eucalyptus 20",s:"have"},
+    {i:"81870",b:"Thameen",n:"Bohemian Infusion",s:"have"},
+    {i:"64105",b:"Armaf",n:"Club de Nuit Sillage",s:"have"},
+    {i:"28499",b:"Masque Milano",n:"Russian Tea",s:"have"},
+    {i:"32269",b:"Yves Saint Laurent",n:"Tuxedo",s:"have"},
+    {i:"102950",b:"Roja Dove",n:"Parfum De La Nuit",s:"have"},
+    {i:"30164",b:"Dior",n:"F\u00e8ve D\u00e9licieuse",s:"have"},
+    {i:"109331",b:"Premiere Peau",n:"Insuline Safrine",s:"have"},
+    {i:"60035",b:"Rabanne",n:"1 Million Parfum",s:"have"},
+    {i:"67815",b:"Arabian Oud",n:"Aseel Special Edition",s:"have"},
+    {i:"65993",b:"Azzaro",n:"Azzaro Pour Homme Cologne Intense",s:"have"},
+    {i:"81895",b:"Goldfield & Banks Australia",n:"Ingenious Ginger",s:"have"},
+    {i:"40716",b:"Penhaligon's",n:"The Tragedy of Lord George",s:"have"},
+    {i:"103445",b:"Gulf Orchid",n:"Mango Ice",s:"have"},
+    {i:"39210",b:"Mizensir",n:"Eau de Gingembre",s:"have"},
+    {i:"24191",b:"Orto Parisi",n:"Bergamask",s:"have"},
+    {i:"98713",b:"Armaf",n:"Monarque",s:"have"},
+    {i:"30526",b:"The Spirit of Dubai",n:"Meydan",s:"have"},
+    {i:"53149",b:"Hugo Boss",n:"Boss Bottled 20th Anniversary Edition",s:"have"},
+    {i:"47334",b:"Zoologist Perfumes",n:"Camel",s:"have"},
+    {i:"68271",b:"Afnan",n:"Supremacy Not Only Intense",s:"have"},
+    {i:"221",b:"Dior",n:"Dune",s:"have"},
+    {i:"52616",b:"Kayali Fragrances",n:"Vanilla | 28",s:"have"},
+    {i:"104529",b:"Lattafa Perfumes",n:"Khamrah Dukhan",s:"have"},
+    {i:"87958",b:"Amouage",n:"Jubilation 40 Man",s:"have"},
+    {i:"60284",b:"Guerlain",n:"L'Homme Id\u00e9al Extr\u00eame",s:"have"},
+    {i:"40816",b:"Maison Francis Kurkdjian",n:"Grand Soir",s:"have"},
+    {i:"98691",b:"Zimaya",n:"Tiramisu Caramel",s:"have"},
+    {i:"70880",b:"Roberto Cavalli",n:"Velour Saffron",s:"have"},
+    {i:"63818",b:"Omanluxury",n:"Royal Incense",s:"have"},
+    {i:"53159",b:"Arabian Oud",n:"Rosewood",s:"have"},
+    {i:"45258",b:"Giorgio Armani",n:"Emporio Armani Stronger With You",s:"have"},
+    {i:"62101",b:"Parfums de Marly",n:"Greenley",s:"have"},
+    {i:"71671",b:"Hugo Boss",n:"The Collection Bold Incense",s:"have"},
+    {i:"44853",b:"Fort & Manle",n:"Fatih Sultan Mehmed",s:"have"},
+    {i:"60300",b:"Jeroboam",n:"Gozo",s:"have"},
+    {i:"105521",b:"French Avenue",n:"Vulcan Sable",s:"have"},
+    {i:"101562",b:"Maison Asrar",n:"Vanilla Voyage",s:"have"},
+    {i:"72619",b:"Carolina Herrera",n:"True Oud",s:"have"},
+    {i:"43642",b:"Carolina Herrera",n:"Gold Incense",s:"have"},
+    {i:"107110",b:"Acqua di Parma",n:"Fico di Amalfi La Riserva",s:"have"},
+    {i:"17338",b:"Versace",n:"Versace Pour Homme Oud Noir",s:"have"},
+    {i:"69012",b:"Arabian Oud",n:"Al Fareed",s:"have"},
+    {i:"55156",b:"Xerjoff",n:"Accento",s:"have"},
+    {i:"71672",b:"Hugo Boss",n:"The Collection Daring Saffiano",s:"have"},
+    {i:"71673",b:"Hugo Boss",n:"The Collection Elegant Vetiver",s:"have"},
+    {i:"70424",b:"Xerjoff",n:"Torino21",s:"have"},
+    {i:"101281",b:"Hugo Boss",n:"The Collection Wild Violet",s:"have"},
+    {i:"84109",b:"Parfums de Marly",n:"Altha\u00efr",s:"have"},
+    {i:"32907",b:"Mancera",n:"Aoud Vanille",s:"have"},
+    {i:"100234",b:"Gucci",n:"Gucci Guilty Love Edition Pour Homme 2024",s:"have"},
+    {i:"87460",b:"Hackett London",n:"Absolute",s:"have"},
+    {i:"54785",b:"Nishane",n:"Ani",s:"have"},
+    {i:"38166",b:"Acqua di Parma",n:"Colonia Sandalo Concentr\u00e9e",s:"have"},
+    {i:"57701",b:"Versace",n:"Vanille Rouge",s:"have"},
+    {i:"103895",b:"Hugo Boss",n:"The Collection Enigmatic Saffiano",s:"have"},
+    {i:"67814",b:"Arabian Oud",n:"Aseel",s:"have"},
+    {i:"93090",b:"Initio Parfums Prives",n:"Oud for Greatness Neo",s:"have"},
+    {i:"70753",b:"Costume National",n:"Secret Woods",s:"have"},
+    {i:"84094",b:"Yves Saint Laurent",n:"MYSLF Eau de Parfum",s:"have"},
+    {i:"70883",b:"Versace",n:"Fleur de Mat\u00e9",s:"have"},
+    {i:"70884",b:"Versace",n:"Gingembre P\u00e9tillant",s:"have"},
+    {i:"70886",b:"Versace",n:"Safran Royal",s:"have"},
+    {i:"30947",b:"Jean Paul Gaultier",n:"Ultra Male",s:"have"},
+    {i:"96240",b:"Maison Alhambra",n:"Signatures No. IV",s:"have"},
+    {i:"84112",b:"Creed",n:"Absolu Aventus 2023",s:"have"},
+    {i:"84074",b:"Hugo Boss",n:"Boss Bottled Elixir",s:"have"},
+    {i:"46662",b:"Mancera",n:"Black Vanilla",s:"have"},
+    {i:"103346",b:"Riiffs Perfumes",n:"Momento",s:"have"},
+    {i:"92497",b:"Xerjoff",n:"Deified Tony Iommi Parfum",s:"have"},
+    {i:"23084",b:"Les Liquides Imaginaires",n:"Fortis",s:"have"},
+    {i:"62856",b:"Amouage",n:"Enclave",s:"have"},
+    {i:"99238",b:"Afnan",n:"9 PM Rebel",s:"have"},
+    {i:"100895",b:"Giorgio Armani",n:"Emporio Armani Stronger With You Parfum",s:"have"},
+    {i:"20509",b:"Thameen",n:"Carved Oud",s:"have"},
+    {i:"32733",b:"Perry Ellis",n:"Black Vanilla Absolute",s:"have"},
+    {i:"30996",b:"Initio Parfums Prives",n:"Magnetic Blend 8",s:"have"},
+    {i:"104238",b:"Davidoff",n:"Cool Elixir",s:"have"},
+    {i:"10145",b:"Amouage",n:"Memoir Man",s:"have"},
+    {i:"30989",b:"Initio Parfums Prives",n:"Absolute Aphrodisiac",s:"have"},
+    {i:"46633",b:"Parfums de Marly",n:"Layton Exclusif",s:"have"},
+    {i:"61928",b:"Jo Malone London",n:"Cypress & Grapevine Cologne Intense",s:"have"},
+    {i:"50603",b:"By Kilian",n:"Dark Lord",s:"have"},
+    {i:"43335",b:"Mancera",n:"Black Gold",s:"have"},
+    {i:"35681",b:"Ralph Lauren",n:"Polo Supreme Leather",s:"have"},
+    {i:"101102",b:"Givenchy",n:"Gentleman Society Eau de Parfum Ambr\u00e9e",s:"have"},
+    {i:"40373",b:"Carolina Herrera",n:"Mystery Tobacco",s:"have"},
+    {i:"39314",b:"Parfums de Marly",n:"Layton",s:"have"},
+    {i:"64153",b:"Amouage",n:"Interlude 53 Man",s:"have"},
+    {i:"49755",b:"Louis Vuitton",n:"Ombre Nomade",s:"have"},
+    {i:"96902",b:"Jo Malone London",n:"Hinoki & Cedarwood",s:"have"},
+    {i:"45396",b:"Prada",n:"Prada L'Homme Intense",s:"have"},
+    {i:"107710",b:"Fragrance World",n:"Barakkat Rouge 540 Extrait de Parfum",s:"have"},
+    {i:"94022",b:"French Avenue",n:"Royal Blend",s:"have"},
+    {i:"102415",b:"Swiss Arabian",n:"Incense 01",s:"have"},
+    {i:"1825",b:"Tom Ford",n:"Tobacco Vanille",s:"have"},
+    {i:"1018",b:"Tom Ford",n:"Black Orchid",s:"have"},
+    {i:"24922",b:"Lacoste",n:"Lacoste Live",s:"have"},
+    {i:"11043",b:"Lacoste",n:"Eau de Lacoste L.12.12. White",s:"have"},
+    {i:"44535",b:"Montblanc",n:"Emblem Absolu",s:"have"},
+    {i:"88175",b:"Lattafa Perfumes",n:"Khamrah Qahwa",s:"have"},
+    {i:"40031",b:"Versace",n:"Versace Pour Homme Dylan Blue",s:"have"},
+    {i:"54720",b:"Marc-Antoine Barrois",n:"Ganymede",s:"have"},
+    {i:"64948",b:"Lattafa Perfumes",n:"Bade'e Al Oud Oud for Glory",s:"have"},
+    {i:"69013",b:"Arabian Oud",n:"Kashmir Musk",s:"have"},
+    {i:"75805",b:"Lattafa Perfumes",n:"Khamrah",s:"have"},
+    {i:"81099",b:"Lattafa Perfumes",n:"Ishq Al Shuyukh Silver",s:"have"},
+    {i:"82732",b:"Reyane Tradition",n:"R2B2 A.I.",s:"have"},
+    {i:"82734",b:"Reyane Tradition",n:"R2B2 Crypto",s:"have"},
+    {i:"92658",b:"Al Haramain Perfumes",n:"Detour Noir Intense",s:"have"},
+    {i:"96074",b:"Laverne",n:"Champion",s:"have"},
+    {i:"100553",b:"Ibraheem AlQurashi",n:"Greek Tobacco",s:"have"},
+    {i:"100572",b:"Ibraheem AlQurashi",n:"Sapphire Leather",s:"have"},
     {i:"115452",b:"",n:"Dirty Milk",s:"have"},
-    {i:"12208",b:"",n:"34 Boulevard Saint Germain",s:"have"},
+    {i:"12208",b:"Guerlain",n:"34 Boulevard Saint Germain",s:"have"},
     {i:"138977",b:"",n:"Cardamom Latte",s:"have"},
     {i:"128406",b:"",n:"Inner Child",s:"have"},
-    {i:"69008",b:"",n:"Ébène Fumé",s:"have"},
+    {i:"69008",b:"Louis Vuitton",n:"\u00c9b\u00e8ne Fum\u00e9",s:"have"},
     {i:"21352",b:"",n:"Patchouli Intense",s:"have"},
-    {i:"51645",b:"",n:"Mercedes-Benz Select Night",s:"have"},
-    {i:"66514",b:"",n:"Spicebomb Infrared",s:"have"},
+    {i:"51645",b:"Mercedes-Benz",n:"Select Night",s:"have"},
+    {i:"66514",b:"Viktor & Rolf",n:"Spicebomb Infrared",s:"have"},
     {i:"95254",b:"",n:"This is Not a Love Spell",s:"have"},
     {i:"138703",b:"",n:"Vanilla Canyon",s:"have"},
-    {i:"135665",b:"",n:"Ralph's Club New York Parfum",s:"have"},
-    {i:"28608",b:"",n:"Eau de Lacoste L.12.12 Yellow (Jaune)",s:"have"},
-    {i:"120986",b:"",n:"Valentino Uomo Born in Roma Purple Melancholia",s:"have"},
-    {i:"98552",b:"",n:"Qissa Delicious",s:"have"},
+    {i:"135665",b:"Ralph Lauren",n:"Ralph's Club New York Parfum",s:"have"},
+    {i:"28608",b:"Lacoste",n:"Eau de Lacoste L.12.12 Yellow (Jaune)",s:"have"},
+    {i:"120986",b:"Valentino",n:"Uomo Born in Roma Purple Melancholia",s:"have"},
+    {i:"98552",b:"Qissa",n:"Delicious",s:"have"},
     {i:"93947",b:"",n:"Mineral Wave",s:"have"},
-    {i:"52802",b:"",n:"Emporio Armani Stronger With You Intensely Giorgio Armani",s:"have"},
-    {i:"67370",b:"",n:"Imagination Louis Vuitton",s:"have"},
-    {i:"61856",b:"",n:"Le Male Le Parfum Jean Paul Gaultier",s:"have"},
-    {i:"50757",b:"",n:"Y Eau de Parfum Yves Saint Laurent",s:"have"},
-    {i:"62615",b:"",n:"Angels' Share By Kilian",s:"have"},
-    {i:"64338",b:"",n:"Bois Impérial Essential Parfums",s:"have"},
-    {i:"25967",b:"",n:"Bleu de Chanel Eau de Parfum Chanel",s:"have"},
-    {i:"20541",b:"",n:"Jazz Club Maison Martin Margiela",s:"have"},
-    {i:"9828",b:"",n:"Aventus Creed",s:"have"}
+    {i:"52802",b:"Giorgio Armani",n:"Emporio Armani Stronger With You Intensely",s:"have"},
+    {i:"67370",b:"Louis Vuitton",n:"Imagination",s:"have"},
+    {i:"61856",b:"Jean Paul Gaultier",n:"Le Male Le Parfum",s:"have"},
+    {i:"50757",b:"Yves Saint Laurent",n:"Y Eau de Parfum",s:"have"},
+    {i:"62615",b:"By Kilian",n:"Angels' Share",s:"have"},
+    {i:"64338",b:"Essential Parfums",n:"Bois Imp\u00e9rial",s:"have"},
+    {i:"25967",b:"Chanel",n:"Bleu de Chanel Eau de Parfum",s:"have"},
+    {i:"20541",b:"Maison Martin Margiela",n:"Jazz Club",s:"have"},
+    {i:"9828",b:"Creed",n:"Aventus",s:"have"}
   ];
 
   var K_STATES = "wardrobe.states";
@@ -431,9 +437,10 @@
   var K_CUSTOM = "wardrobe.custom";
   var K_LAST_EXPORT = "wardrobe.lastExport";
   var K_LAST_DRAW = "wardrobe.lastDraw";
+  var K_REMOVED = "wardrobe.removed";
 
-  var CATS = { have:"Have", want:"Want", had:"Had", not:"Not mine" };
-  var CAT_ORDER = ["have","want","had","not"];
+  var CATS = { have:"Have", want:"Want", had:"Had" };
+  var CAT_ORDER = ["have","want","had"];
 
   // ---- storage helpers ----
   function safeParse(json, fallback){
@@ -473,6 +480,52 @@
   }
   function saveCustom(c){ localStorage.setItem(K_CUSTOM, JSON.stringify(c)); }
 
+  function loadRemoved(){
+    var raw = safeParse(localStorage.getItem(K_REMOVED), []);
+    return Array.isArray(raw) ? raw : [];
+  }
+  function saveRemoved(r){ localStorage.setItem(K_REMOVED, JSON.stringify(r)); }
+
+  // The Not Mine category was removed in favor of actually removing a
+  // perfume from the collection. Anything already marked "not" gets moved
+  // into the removed list on first load so no prior choice is lost.
+  function migrateNotMineToRemoved(){
+    var states = loadStates();
+    var removed = loadRemoved();
+    var statesChanged = false;
+    var removedChanged = false;
+    Object.keys(states).forEach(function(id){
+      if(states[id] === "not"){
+        delete states[id];
+        statesChanged = true;
+        if(removed.indexOf(id) === -1){
+          removed.push(id);
+          removedChanged = true;
+        }
+      }
+    });
+    if(statesChanged) saveStates(states);
+    if(removedChanged) saveRemoved(removed);
+  }
+
+  function removePerfume(id){
+    var custom = loadCustom();
+    var idx = custom.findIndex(function(p){ return p.i === id; });
+    if(idx !== -1){
+      custom.splice(idx, 1);
+      saveCustom(custom);
+    }else{
+      var removed = loadRemoved();
+      if(removed.indexOf(id) === -1){
+        removed.push(id);
+        saveRemoved(removed);
+      }
+    }
+    var states = loadStates();
+    delete states[id];
+    saveStates(states);
+  }
+
   // ---- dates ----
   function todayISO(){
     var d = new Date();
@@ -495,9 +548,11 @@
   // ---- collection ----
   function getCollection(){
     var custom = loadCustom();
+    var removed = loadRemoved();
     var byId = new Map();
     DATA.forEach(function(p){ byId.set(p.i, { i:p.i, b:p.b, n:p.n, url:null }); });
     custom.forEach(function(p){ byId.set(p.i, { i:p.i, b:p.b, n:p.n, url:p.url || null }); });
+    removed.forEach(function(id){ byId.delete(id); });
     return Array.from(byId.values());
   }
   function findInCollection(id){
@@ -566,6 +621,7 @@
     searchInput: "",       // raw, pre-debounce
     filterCat: "all",
     renderLimit: 60,
+    pendingRemoveId: null,
     draw: { current:null, drawing:false, loading:false, revealed:false },
     add: { step:"input", raw:"", parsed:null, dup:null, imgState:"loading", brand:"", name:"", cat:"have" },
     backup: { exportText:"", importRaw:"", importParsed:null, pending:null }
@@ -579,6 +635,7 @@
   function setTab(t){
     state.tab = t;
     state.screen = null;
+    state.pendingRemoveId = null;
     render();
   }
   tabbarEl.addEventListener("click", function(e){
@@ -691,6 +748,8 @@
       started = true;
       if(!loaded.length) loaded.push(final);
       state.draw.loading = false;
+      state.draw.current = loaded[Math.floor(Math.random() * loaded.length)];
+      if(onDrawScreen()) render();
       runCycle(loaded, final);
     }
 
@@ -867,21 +926,21 @@
         var cat = getCategory(p.i, states);
         var link = fragranticaLink(p);
         html += '<div class="row" data-id="' + esc(p.i) + '">';
+        html += '<div class="row-top">';
         html += '<div class="thumbwrap"><img loading="lazy" src="' + bottleImgUrl(p.i) + '" onload="this.classList.add(\'loaded\')" onerror="this.remove()"><span class="fallback">' + esc((p.b || p.n || "?").charAt(0)) + '</span></div>';
         html += '<div class="row-meta"><div class="b">' + esc(p.b) + '</div><div class="n">' + esc(p.n) + '</div></div>';
-        html += '<div class="cats">';
+        html += '</div>';
+        html += '<div class="row-actions">';
         html += '<div class="cats-row">';
-        ["have","want"].forEach(function(c){
+        CAT_ORDER.forEach(function(c){
           var active = cat === c ? " active" : "";
           html += '<button class="catbtn' + active + '" onclick="app.setCategory(\'' + esc(p.i) + '\',\'' + c + '\')">' + CATS[c] + '</button>';
         });
-        html += '</div><div class="cats-row">';
-        ["had","not"].forEach(function(c){
-          var active = cat === c ? " active" : "";
-          html += '<button class="catbtn' + active + '" onclick="app.setCategory(\'' + esc(p.i) + '\',\'' + c + '\')">' + CATS[c] + '</button>';
-        });
-        html += '</div></div>';
+        html += '</div>';
         html += '<a class="fraglink" href="' + esc(link) + '" target="_blank" rel="noopener">&#8599;</a>';
+        var pendingRemove = state.pendingRemoveId === p.i;
+        html += '<button class="removebtn' + (pendingRemove ? " pending" : "") + '" onclick="app.removeRow(\'' + esc(p.i) + '\')">' + (pendingRemove ? "Sure?" : "Remove") + '</button>';
+        html += '</div>';
         html += '</div>';
       });
       if(filtered.length > shown.length){
@@ -936,6 +995,16 @@
     }
   }
   function setFilterCat(c){ state.filterCat = c; state.renderLimit = 60; render(); }
+  function removeRow(id){
+    if(state.pendingRemoveId !== id){
+      state.pendingRemoveId = id;
+      render();
+      return;
+    }
+    removePerfume(id);
+    state.pendingRemoveId = null;
+    render();
+  }
   function setCategory(id, cat){
     var states = loadStates();
     states[id] = cat;
@@ -1256,6 +1325,7 @@
     deleteLogEntry: deleteLogEntry,
     setFilterCat: setFilterCat,
     setCategory: setCategory,
+    removeRow: removeRow,
     openAdd: openAdd,
     closeAdd: closeAdd,
     addContinue: addContinue,
@@ -1272,6 +1342,7 @@
     confirmImport: confirmImport
   };
 
+  migrateNotMineToRemoved();
   render();
 })();
 </script>
